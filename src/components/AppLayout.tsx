@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { state, user, dispatch, logout } = useAppStore();
+  const { state, user, tenant, dispatch, logout } = useAppStore();
 
   const navigation = [
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -33,7 +33,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="bg-primary/10 p-1.5 rounded-md">
               <Activity className="h-5 w-5 text-primary" />
             </div>
-            <span className="font-semibold text-primary">HIMS</span>
+            <div className="min-w-0">
+              <span className="font-semibold text-primary block leading-tight">HIMS</span>
+              <span className="text-[10px] text-muted-foreground truncate block max-w-[150px]">
+                {tenant.name}
+              </span>
+            </div>
           </SidebarHeader>
           <SidebarContent className="p-2 gap-1">
             <SidebarMenu>
@@ -85,7 +90,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <div className="hidden md:flex flex-col items-end leading-tight">
                 <span className="text-sm font-medium">{user.name}</span>
                 <span className="text-[11px] text-muted-foreground">
-                  {user.role}{user.departmentId ? ` · ${state.departments[user.departmentId]?.name ?? user.departmentId}` : ""}
+                  {tenant.slug} · {user.role}{user.departmentId ? ` · ${state.departments[user.departmentId]?.name ?? user.departmentId}` : ""}
                 </span>
               </div>
               <Button variant="outline" size="sm" onClick={logout}>

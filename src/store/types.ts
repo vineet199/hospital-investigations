@@ -2,6 +2,13 @@ export type Priority = "Routine" | "Urgent" | "Stat";
 export type Status = "Ordered" | "Sent to Department" | "In Progress" | "Result Ready" | "Reviewed by Doctor";
 export type UserRole = "Admin" | "Doctor" | "Nurse" | "Technician" | "Department Head" | "Billing" | "Reception";
 
+export interface Tenant {
+  id: string;
+  slug: string;
+  name: string;
+  logoUrl?: string;
+}
+
 export interface Patient {
   id: string;
   mrn?: string;
@@ -25,6 +32,7 @@ export interface Department {
 
 export interface AppUser {
   id: string;
+  tenantId: string;
   email: string;
   name: string;
   role: UserRole;

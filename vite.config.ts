@@ -4,7 +4,6 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
 const rawPort = process.env.PORT ?? "5173";
-const rawApiPort = process.env.API_PORT ?? "4173";
 
 const port = Number(rawPort);
 
@@ -34,12 +33,6 @@ export default defineConfig({
     strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
-    proxy: {
-      "/api": {
-        target: `http://localhost:${rawApiPort}`,
-        changeOrigin: true,
-      },
-    },
     fs: {
       strict: true,
     },

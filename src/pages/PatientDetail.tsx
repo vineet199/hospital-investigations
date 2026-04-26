@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -46,27 +47,248 @@ interface DraftRow {
   departmentId: string;
 }
 
+interface OrderMeta {
+  clinicalDiagnosis: string;
+  provisionalDiagnosis: string;
+  specimen: string;
+  billingClass: string;
+  paymentType: string;
+  collectionTiming: string;
+  lmp: string;
+  remarks: string;
+}
+
+interface RequisitionSection {
+  title: string;
+  departmentId: string;
+  tests: string[];
+}
+
+const PATIENT_CLASS_OPTIONS = ["IPD", "OPD", "Emergency", "Day care"];
+const PAYMENT_OPTIONS = ["Cash", "Credit", "Insurance", "Corporate", "Package"];
+const SPECIMEN_OPTIONS = [
+  "Blood",
+  "Urine",
+  "Stool",
+  "Sputum",
+  "Swab",
+  "Tissue / biopsy",
+  "Fluid / CSF",
+  "Imaging / no specimen",
+  "Other",
+];
+const COLLECTION_TIMING_OPTIONS = ["Fasting", "Post-prandial", "Random", "24-hour sample", "Pre-op", "Post-op"];
+
+const REQUISITION_SECTIONS: RequisitionSection[] = [
+  {
+    title: "Haematology / Coagulation",
+    departmentId: "DEP-3",
+    tests: [
+      "CBC / Complete haemogram",
+      "Hb",
+      "TLC / WBC count",
+      "DLC",
+      "ESR",
+      "Platelet count",
+      "Peripheral smear",
+      "Reticulocyte count",
+      "Blood group & Rh",
+      "BT / CT",
+      "PT / INR",
+      "APTT",
+      "Malaria parasite",
+      "Sickling test",
+    ],
+  },
+  {
+    title: "Biochemistry",
+    departmentId: "DEP-3",
+    tests: [
+      "Blood sugar - fasting",
+      "Blood sugar - PP",
+      "Blood sugar - random",
+      "HbA1c",
+      "Urea",
+      "Creatinine",
+      "Uric acid",
+      "Sodium",
+      "Potassium",
+      "Chloride",
+      "Calcium",
+      "Phosphorus",
+      "Total bilirubin",
+      "Direct bilirubin",
+      "SGOT / AST",
+      "SGPT / ALT",
+      "Alkaline phosphatase",
+      "Total protein",
+      "Albumin",
+      "Globulin",
+      "LFT",
+      "RFT / KFT",
+      "Lipid profile",
+      "Cholesterol",
+      "Triglycerides",
+      "HDL",
+      "LDL",
+      "Amylase",
+      "Lipase",
+    ],
+  },
+  {
+    title: "Serology / Immunology",
+    departmentId: "DEP-3",
+    tests: [
+      "HIV I & II",
+      "HBsAg",
+      "Anti-HCV",
+      "VDRL",
+      "Widal",
+      "Dengue NS1",
+      "Dengue IgM",
+      "Dengue IgG",
+      "Malaria antigen",
+      "Typhidot",
+      "CRP",
+      "RA factor",
+      "ASO titre",
+      "H. pylori",
+      "COVID antigen / RT-PCR",
+    ],
+  },
+  {
+    title: "Urine / Stool / Clinical Pathology",
+    departmentId: "DEP-3",
+    tests: [
+      "Urine routine & microscopy",
+      "Urine albumin",
+      "Urine sugar",
+      "Urine ketone",
+      "Urine pregnancy test",
+      "Urine culture",
+      "24-hour urine protein",
+      "Stool routine & microscopy",
+      "Stool occult blood",
+      "Stool ova / cyst",
+    ],
+  },
+  {
+    title: "Microbiology / Cultures",
+    departmentId: "DEP-3",
+    tests: [
+      "Blood culture & sensitivity",
+      "Urine culture & sensitivity",
+      "Sputum culture & sensitivity",
+      "Pus culture & sensitivity",
+      "Wound swab culture",
+      "Throat swab culture",
+      "CSF culture",
+      "Gram stain",
+      "AFB stain",
+      "KOH mount",
+    ],
+  },
+  {
+    title: "Hormones / Special Tests",
+    departmentId: "DEP-3",
+    tests: [
+      "T3",
+      "T4",
+      "TSH",
+      "Vitamin D",
+      "Vitamin B12",
+      "Ferritin",
+      "D-dimer",
+      "Troponin I",
+      "Procalcitonin",
+      "PSA",
+      "CA-125",
+      "Beta-hCG",
+      "FSH",
+      "LH",
+      "Prolactin",
+    ],
+  },
+  {
+    title: "Radiology / Imaging",
+    departmentId: "DEP-4",
+    tests: [
+      "X-Ray",
+      "USG / Ultrasound",
+      "CT Scan",
+      "MRI",
+      "Doppler",
+      "Mammography",
+      "Contrast study",
+    ],
+  },
+  {
+    title: "Cardiology",
+    departmentId: "DEP-6",
+    tests: ["ECG", "2D Echo", "TMT", "Holter monitoring", "Cardiac enzymes"],
+  },
+  {
+    title: "Blood Bank",
+    departmentId: "DEP-5",
+    tests: ["Blood grouping", "Cross match", "Coombs test", "Component request", "Transfusion reaction workup"],
+  },
+];
+
+const REQUISITION_TEST_LOOKUP: Map<string, { section: RequisitionSection; test: string }> = new Map(
+  REQUISITION_SECTIONS.flatMap((section) =>
+    section.tests.map((test) => [`${section.title}:${test}`, { section, test }] as const),
+  ),
+);
+
 function emptyRow(departmentDefault: string): DraftRow {
   return {
     id: `draft-${Math.random().toString(36).slice(2, 9)}`,
-    type: "Blood Test",
+    type: "",
     priority: "Routine",
     notes: "",
     departmentId: departmentDefault,
   };
 }
 
+function buildInvestigationNotes(row: DraftRow, meta: OrderMeta) {
+  return [
+    meta.provisionalDiagnosis.trim() ? `Provisional diagnosis: ${meta.provisionalDiagnosis.trim()}` : "",
+    meta.clinicalDiagnosis.trim() ? `Clinical diagnosis: ${meta.clinicalDiagnosis.trim()}` : "",
+    meta.specimen ? `Specimen/source: ${meta.specimen}` : "",
+    meta.billingClass ? `Patient class: ${meta.billingClass}` : "",
+    meta.paymentType ? `Payment/category: ${meta.paymentType}` : "",
+    meta.collectionTiming ? `Collection/timing: ${meta.collectionTiming}` : "",
+    meta.lmp.trim() ? `LMP: ${meta.lmp.trim()}` : "",
+    meta.remarks.trim() ? `Remarks: ${meta.remarks.trim()}` : "",
+    row.notes.trim() ? `Instructions: ${row.notes.trim()}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 export default function PatientDetail() {
   const params = useParams<{ id: string }>();
-  const { state, dispatch, can, isLoading } = useAppStore();
+  const { state, user, dispatch, can, isLoading } = useAppStore();
   const patient = state.patients[params.id];
   const departments = Object.values(state.departments);
   const defaultDeptId = departments[0]?.id ?? "";
+  const requestedAt = useMemo(() => new Date().toLocaleString(), []);
   const canCreateOrders = can("createOrders");
   const canDispatchOrders = can("dispatchOrders");
   const canReviewResults = can("reviewResults");
 
   const [drafts, setDrafts] = useState<DraftRow[]>([emptyRow(defaultDeptId)]);
+  const [selectedTestKeys, setSelectedTestKeys] = useState<string[]>([]);
+  const [orderMeta, setOrderMeta] = useState<OrderMeta>({
+    clinicalDiagnosis: "",
+    provisionalDiagnosis: "",
+    specimen: "Blood",
+    billingClass: "IPD",
+    paymentType: "Cash",
+    collectionTiming: "Random",
+    lmp: "",
+    remarks: "",
+  });
   const [resultDialog, setResultDialog] = useState<{
     open: boolean;
     investigationId?: string;
@@ -122,10 +344,34 @@ export default function PatientDetail() {
   };
   const addDraft = () => setDrafts((d) => [...d, emptyRow(defaultDeptId)]);
 
+  const toggleRequisitionTest = (key: string, checked: boolean) => {
+    setSelectedTestKeys((previous) => {
+      if (checked) return previous.includes(key) ? previous : [...previous, key];
+      return previous.filter((item) => item !== key);
+    });
+  };
+
+  const setSingleMetaValue = (field: keyof OrderMeta, value: string) => {
+    setOrderMeta((meta) => ({ ...meta, [field]: value }));
+  };
+
   const submitDrafts = async () => {
-    const valid = drafts.filter((d) => d.type && d.departmentId);
+    const selectedRows: DraftRow[] = selectedTestKeys.flatMap((key) => {
+      const item = REQUISITION_TEST_LOOKUP.get(key);
+      if (!item) return [];
+      return [
+        {
+          id: key,
+          type: item.test,
+          priority: "Routine" as Priority,
+          notes: "",
+          departmentId: item.section.departmentId,
+        },
+      ];
+    });
+    const valid = [...selectedRows, ...drafts.filter((d) => d.type.trim() && d.departmentId)];
     if (valid.length === 0) {
-      toast.error("Add at least one valid investigation.");
+      toast.error("Select at least one checkbox test or add one valid investigation.");
       return;
     }
     try {
@@ -134,8 +380,8 @@ export default function PatientDetail() {
         payload: valid.map((d) => ({
           patientId: patient.id,
           orderedByDoctorId: state.currentDoctorId,
-          type: d.type,
-          notes: d.notes,
+          type: d.type.trim(),
+          notes: buildInvestigationNotes(d, orderMeta),
           priority: d.priority,
           departmentId: d.departmentId,
         })),
@@ -144,8 +390,9 @@ export default function PatientDetail() {
         `${valid.length} ${valid.length === 1 ? "investigation" : "investigations"} ordered for ${patient.name}.`,
       );
       setDrafts([emptyRow(defaultDeptId)]);
+      setSelectedTestKeys([]);
     } catch {
-      // Error toast is shown by the API-backed store.
+      // Error toast is shown by the Supabase-backed store.
     }
   };
 
@@ -163,7 +410,7 @@ export default function PatientDetail() {
       });
       toast.success(`Sent to ${state.departments[inv.departmentId]?.name}.`);
     } catch {
-      // Error toast is shown by the API-backed store.
+      // Error toast is shown by the Supabase-backed store.
     }
   };
 
@@ -178,7 +425,7 @@ export default function PatientDetail() {
       });
       toast.success("Marked as reviewed.");
     } catch {
-      // Error toast is shown by the API-backed store.
+      // Error toast is shown by the Supabase-backed store.
     }
   };
 
@@ -217,97 +464,275 @@ export default function PatientDetail() {
         </Card>
       </div>
 
-      <Card>
+      <Card className="border-primary/20">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Plus className="h-4 w-4" /> Add Investigations
+            <Plus className="h-4 w-4" /> Investigation Requisition Form
           </CardTitle>
           <CardDescription>
             {canCreateOrders
-              ? "Add one or more investigations to order. Each row is assigned to a target department."
+              ? "Paper-style request form with patient details, consultant, clinical notes, specimen, and ordered tests."
               : "Only doctors and admins can place new investigation orders."}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
+          <datalist id="investigation-type-options">
+            {INVESTIGATION_TYPES.map((type) => (
+              <option key={type} value={type} />
+            ))}
+          </datalist>
           {!canCreateOrders && (
             <div className="text-sm text-muted-foreground border rounded-lg p-4 bg-muted/30">
               You can still view this patient’s investigation history, but ordering is disabled for your role.
             </div>
           )}
-          {canCreateOrders && drafts.map((row, idx) => (
-            <div
-              key={row.id}
-              className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end p-3 border rounded-lg bg-muted/30"
-            >
-              <div className="md:col-span-3 flex flex-col gap-1.5">
-                <Label className="text-xs">Type</Label>
-                <Select value={row.type} onValueChange={(v) => updateDraft(row.id, { type: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {INVESTIGATION_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          {canCreateOrders && (
+            <>
+              <div className="rounded-lg border bg-muted/20 p-4">
+                <div className="flex items-center justify-between gap-3 border-b pb-3 mb-3">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Patient / ward details and request information
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Includes all printed-form fields: patient category, specimen, timing, clinical details, and remarks.
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                    {orderMeta.billingClass}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  <div className="md:col-span-3 flex flex-col gap-1.5">
+                    <Label className="text-xs">MRN / Patient ID</Label>
+                    <Input readOnly value={`${patient.mrn ?? patient.id} / ${patient.id}`} className="bg-background" />
+                  </div>
+                  <div className="md:col-span-3 flex flex-col gap-1.5">
+                    <Label className="text-xs">Patient name</Label>
+                    <Input readOnly value={patient.name} className="bg-background" />
+                  </div>
+                  <div className="md:col-span-2 flex flex-col gap-1.5">
+                    <Label className="text-xs">Age / sex</Label>
+                    <Input readOnly value={`${patient.age}y / ${patient.gender}`} className="bg-background" />
+                  </div>
+                  <div className="md:col-span-2 flex flex-col gap-1.5">
+                    <Label className="text-xs">Ward / bed</Label>
+                    <Input readOnly value={`${patient.ward} / ${patient.bed}`} className="bg-background" />
+                  </div>
+                  <div className="md:col-span-2 flex flex-col gap-1.5">
+                    <Label className="text-xs">Date / time</Label>
+                    <Input readOnly value={requestedAt} className="bg-background" />
+                  </div>
+
+                  <div className="md:col-span-4 flex flex-col gap-1.5">
+                    <Label className="text-xs">Consultant / requesting doctor</Label>
+                    <Select
+                      value={state.currentDoctorId}
+                      disabled={user.role !== "Admin"}
+                      onValueChange={(val) => dispatch({ type: "SET_CURRENT_DOCTOR", payload: val })}
+                    >
+                      <SelectTrigger className="bg-background">
+                        <SelectValue placeholder="Select doctor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.values(state.doctors).map((doc) => (
+                          <SelectItem key={doc.id} value={doc.id}>
+                            {doc.name} ({doc.department})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <CheckboxGroup
+                    className="md:col-span-4"
+                    label="Patient class"
+                    options={PATIENT_CLASS_OPTIONS}
+                    value={orderMeta.billingClass}
+                    onChange={(value) => setSingleMetaValue("billingClass", value)}
+                  />
+                  <CheckboxGroup
+                    className="md:col-span-4"
+                    label="Payment / category"
+                    options={PAYMENT_OPTIONS}
+                    value={orderMeta.paymentType}
+                    onChange={(value) => setSingleMetaValue("paymentType", value)}
+                  />
+                  <CheckboxGroup
+                    className="md:col-span-4"
+                    label="Collection / timing"
+                    options={COLLECTION_TIMING_OPTIONS}
+                    value={orderMeta.collectionTiming}
+                    onChange={(value) => setSingleMetaValue("collectionTiming", value)}
+                  />
+                  <CheckboxGroup
+                    className="md:col-span-12"
+                    label="Specimen / source"
+                    options={SPECIMEN_OPTIONS}
+                    value={orderMeta.specimen}
+                    onChange={(value) => setSingleMetaValue("specimen", value)}
+                  />
+
+                  <div className="md:col-span-4 flex flex-col gap-1.5">
+                    <Label className="text-xs">Provisional diagnosis</Label>
+                    <Textarea
+                      placeholder="Provisional diagnosis"
+                      value={orderMeta.provisionalDiagnosis}
+                      onChange={(event) =>
+                        setOrderMeta((meta) => ({ ...meta, provisionalDiagnosis: event.target.value }))
+                      }
+                      className="min-h-[56px] bg-background"
+                    />
+                  </div>
+                  <div className="md:col-span-4 flex flex-col gap-1.5">
+                    <Label className="text-xs">Clinical diagnosis / indication</Label>
+                    <Textarea
+                      placeholder="Diagnosis, provisional diagnosis, or reason for investigation"
+                      value={orderMeta.clinicalDiagnosis}
+                      onChange={(event) =>
+                        setOrderMeta((meta) => ({ ...meta, clinicalDiagnosis: event.target.value }))
+                      }
+                      className="min-h-[56px] bg-background"
+                    />
+                  </div>
+                  <div className="md:col-span-2 flex flex-col gap-1.5">
+                    <Label className="text-xs">LMP</Label>
+                    <Input
+                      placeholder="If applicable"
+                      value={orderMeta.lmp}
+                      onChange={(event) => setOrderMeta((meta) => ({ ...meta, lmp: event.target.value }))}
+                      className="bg-background"
+                    />
+                  </div>
+                  <div className="md:col-span-2 flex flex-col gap-1.5">
+                    <Label className="text-xs">Remarks</Label>
+                    <Textarea
+                      placeholder="Additional remarks"
+                      value={orderMeta.remarks}
+                      onChange={(event) => setOrderMeta((meta) => ({ ...meta, remarks: event.target.value }))}
+                      className="min-h-[56px] bg-background"
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="md:col-span-2 flex flex-col gap-1.5">
-                <Label className="text-xs">Priority</Label>
-                <Select
-                  value={row.priority}
-                  onValueChange={(v: Priority) => updateDraft(row.id, { priority: v })}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Routine">Routine</SelectItem>
-                    <SelectItem value="Urgent">Urgent</SelectItem>
-                    <SelectItem value="Stat">Stat</SelectItem>
-                  </SelectContent>
-                </Select>
+
+              <div className="rounded-lg border bg-card overflow-hidden">
+                <div className="flex items-center justify-between gap-3 bg-muted/40 px-4 py-3 border-b">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Investigation checklist
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Select tests from the printed requisition categories. Selected: {selectedTestKeys.length}
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4">
+                  {REQUISITION_SECTIONS.map((section) => (
+                    <div key={section.title} className="rounded-md border bg-muted/10 p-3">
+                      <div className="text-sm font-semibold mb-2">{section.title}</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {section.tests.map((test) => {
+                          const key = `${section.title}:${test}`;
+                          return (
+                            <CheckboxLine
+                              key={key}
+                              label={test}
+                              checked={selectedTestKeys.includes(key)}
+                              onCheckedChange={(checked) => toggleRequisitionTest(key, checked)}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="md:col-span-3 flex flex-col gap-1.5">
-                <Label className="text-xs">Send to</Label>
-                <Select
-                  value={row.departmentId}
-                  onValueChange={(v) => updateDraft(row.id, { departmentId: v })}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {departments.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+
+              <div className="rounded-lg border overflow-hidden">
+                <div className="hidden md:grid grid-cols-12 gap-3 px-3 py-2 bg-muted/40 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <div className="col-span-3">Additional investigation / test</div>
+                  <div className="col-span-3">Department / lab</div>
+                  <div className="col-span-2">Priority</div>
+                  <div className="col-span-3">Special instructions</div>
+                  <div className="col-span-1 text-right">Remove</div>
+                </div>
+
+                {drafts.map((row) => (
+                  <div
+                    key={row.id}
+                    className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end p-3 border-t first:border-t-0 md:first:border-t bg-card"
+                  >
+                    <div className="md:col-span-3 flex flex-col gap-1.5">
+                      <Label className="text-xs md:hidden">Investigation / test required</Label>
+                      <Input
+                        list="investigation-type-options"
+                        placeholder="Other test not listed above"
+                        value={row.type}
+                        onChange={(event) => updateDraft(row.id, { type: event.target.value })}
+                      />
+                    </div>
+                    <div className="md:col-span-3 flex flex-col gap-1.5">
+                      <Label className="text-xs md:hidden">Department / lab</Label>
+                      <Select
+                        value={row.departmentId}
+                        onValueChange={(v) => updateDraft(row.id, { departmentId: v })}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {departments.map((d) => (
+                            <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="md:col-span-2 flex flex-col gap-1.5">
+                      <Label className="text-xs md:hidden">Priority</Label>
+                      <Select
+                        value={row.priority}
+                        onValueChange={(v: Priority) => updateDraft(row.id, { priority: v })}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Routine">Routine</SelectItem>
+                          <SelectItem value="Urgent">Urgent</SelectItem>
+                          <SelectItem value="Stat">Stat</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="md:col-span-3 flex flex-col gap-1.5">
+                      <Label className="text-xs md:hidden">Special instructions</Label>
+                      <Input
+                        placeholder="Fasting, contrast, repeat, etc."
+                        value={row.notes}
+                        onChange={(e) => updateDraft(row.id, { notes: e.target.value })}
+                      />
+                    </div>
+                    <div className="md:col-span-1 flex justify-end">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeDraft(row.id)}
+                        disabled={drafts.length === 1}
+                        aria-label="Remove row"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="md:col-span-3 flex flex-col gap-1.5">
-                <Label className="text-xs">Notes</Label>
-                <Input
-                  placeholder="Clinical notes (optional)"
-                  value={row.notes}
-                  onChange={(e) => updateDraft(row.id, { notes: e.target.value })}
-                />
-              </div>
-              <div className="md:col-span-1 flex justify-end">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeDraft(row.id)}
-                  disabled={drafts.length === 1}
-                  aria-label="Remove row"
-                >
-                  <X className="h-4 w-4" />
+
+              <div className="flex items-center justify-between gap-3 pt-1">
+                <Button variant="outline" size="sm" onClick={addDraft}>
+                  <Plus className="h-4 w-4 mr-1" /> Add another test
+                </Button>
+                <Button onClick={submitDrafts} disabled={isLoading}>
+                  {isLoading ? "Submitting…" : `Submit ${drafts.length} ${drafts.length === 1 ? "Order" : "Orders"}`}
                 </Button>
               </div>
-            </div>
-          ))}
-          {canCreateOrders && (
-          <div className="flex items-center justify-between gap-3 pt-1">
-            <Button variant="outline" size="sm" onClick={addDraft}>
-              <Plus className="h-4 w-4 mr-1" /> Add another
-            </Button>
-            <Button onClick={submitDrafts} disabled={isLoading}>
-              {isLoading ? "Submitting…" : `Submit ${drafts.length} ${drafts.length === 1 ? "Order" : "Orders"}`}
-            </Button>
-          </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -444,6 +869,61 @@ export default function PatientDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function CheckboxLine({
+  label,
+  checked,
+  onCheckedChange,
+}: {
+  label: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  const id = `check-${label.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`;
+  return (
+    <label htmlFor={id} className="flex items-start gap-2 text-xs leading-snug cursor-pointer">
+      <Checkbox
+        id={id}
+        checked={checked}
+        onCheckedChange={(value) => onCheckedChange(value === true)}
+        className="mt-0.5"
+      />
+      <span>{label}</span>
+    </label>
+  );
+}
+
+function CheckboxGroup({
+  label,
+  options,
+  value,
+  onChange,
+  className = "",
+}: {
+  label: string;
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+}) {
+  return (
+    <div className={`flex flex-col gap-1.5 rounded-md border bg-background p-3 ${className}`}>
+      <Label className="text-xs">{label}</Label>
+      <div className="flex flex-wrap gap-x-4 gap-y-2">
+        {options.map((option) => (
+          <CheckboxLine
+            key={option}
+            label={option}
+            checked={value === option}
+            onCheckedChange={(checked) => {
+              if (checked) onChange(option);
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 }

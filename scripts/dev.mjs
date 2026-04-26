@@ -2,20 +2,15 @@ import { spawn } from "node:child_process";
 
 const isWindows = process.platform === "win32";
 
+// Supabase now provides auth + database APIs directly to the Vite client.
+// This compatibility wrapper keeps `node scripts/dev.mjs` working without
+// starting the legacy SQLite API server.
 const children = [
-  spawn("node", ["server/index.mjs"], {
-    stdio: "inherit",
-    env: {
-      ...process.env,
-      API_PORT: process.env.API_PORT ?? "4173",
-    },
-  }),
   spawn(isWindows ? "pnpm.cmd" : "pnpm", ["dev:client"], {
     stdio: "inherit",
     env: {
       ...process.env,
       PORT: process.env.PORT ?? "5173",
-      API_PORT: process.env.API_PORT ?? "4173",
     },
   }),
 ];
