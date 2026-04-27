@@ -4,6 +4,8 @@ This app now uses Supabase Auth + Postgres instead of the local SQLite API serve
 
 For the full product roadmap, onboarding plan, role matrix, and commercial SaaS phases, see [`README.md`](./README.md).
 
+For GitHub Pages demo deployment, see [`DEPLOYMENT.md`](./DEPLOYMENT.md).
+
 ## 1. Create a Supabase project
 
 Create a project at <https://supabase.com>, then copy:

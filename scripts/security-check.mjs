@@ -7,6 +7,7 @@ const includeRoots = [
   "README.md",
   "SUPABASE_SETUP.md",
   "package.json",
+  ".github",
   "scripts",
   "src",
   "supabase",

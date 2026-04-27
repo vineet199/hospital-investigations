@@ -4,6 +4,8 @@ This project is evolving from a single-hospital investigation tracker into a Sup
 
 See [`SUPABASE_SETUP.md`](./SUPABASE_SETUP.md) for Supabase environment setup, migrations, and demo user seeding.
 
+For demo deployment on GitHub Pages, see [`DEPLOYMENT.md`](./DEPLOYMENT.md).
+
 ## Database provider boundary
 
 Hospitals may not always allow Supabase. The frontend now goes through a database adapter boundary under `src/lib/database` instead of calling Supabase directly from app code.
@@ -38,6 +40,12 @@ Run the lightweight secret/security scan before committing:
 
 ```bash
 pnpm security:check
+```
+
+For a GitHub Pages demo build, use:
+
+```bash
+pnpm build:github
 ```
 
 ## Current foundation
