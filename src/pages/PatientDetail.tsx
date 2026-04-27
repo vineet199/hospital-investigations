@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Select,
   SelectContent,
@@ -729,6 +730,7 @@ export default function PatientDetail() {
                   <Plus className="h-4 w-4 mr-1" /> Add another test
                 </Button>
                 <Button onClick={submitDrafts} disabled={isLoading}>
+                  {isLoading && <Spinner className="mr-2" />}
                   {isLoading ? "Submitting…" : `Submit ${drafts.length} ${drafts.length === 1 ? "Order" : "Orders"}`}
                 </Button>
               </div>
@@ -779,6 +781,7 @@ export default function PatientDetail() {
                         disabled={!canDispatchOrders || isLoading}
                         title={!canDispatchOrders ? "Only doctors, nurses, and admins can dispatch orders" : undefined}
                       >
+                        {isLoading && <Spinner className="mr-2" />}
                         <Send className="h-3.5 w-3.5 mr-1" /> Send to {dept?.name}
                       </Button>
                     )}
@@ -796,6 +799,7 @@ export default function PatientDetail() {
                         disabled={!canReviewResults || isLoading}
                         title={!canReviewResults ? "Only doctors and admins can review results" : undefined}
                       >
+                        {isLoading && <Spinner className="mr-2" />}
                         <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Mark Reviewed
                       </Button>
                     )}

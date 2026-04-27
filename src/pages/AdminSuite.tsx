@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Select,
   SelectContent,
@@ -52,6 +54,7 @@ const PLAN_LABEL: Record<string, string> = {
 export default function AdminSuite() {
   const { tenant, user, state, refresh } = useAppStore();
   const [isBusy, setIsBusy] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [data, setData] = useState<Record<string, Row[]>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -132,7 +135,11 @@ export default function AdminSuite() {
   const investigations = Object.values(state.investigations);
 
   const loadData = useCallback(async () => {
-    if (!databaseAdapter.isConfigured) return;
+    if (!databaseAdapter.isConfigured) {
+      setIsLoadingData(false);
+      return;
+    }
+    setIsLoadingData(true);
     setLoadError(null);
     const tables = [
       "tenants",
@@ -193,6 +200,7 @@ export default function AdminSuite() {
         reportFooter: settings.report_footer ?? "",
       }));
     }
+    setIsLoadingData(false);
   }, [tenant.id, tenant.name]);
 
   useEffect(() => {
@@ -248,6 +256,8 @@ export default function AdminSuite() {
         <Metric title="Invoices" value={data.invoices?.length ?? 0} icon={<Receipt className="h-4 w-4" />} />
       </div>
 
+      {isLoadingData && <LoadingPanel label="Loading onboarding and operations data…" />}
+
       {isPlatformAdmin && (
         <Section icon={<Building2 className="h-4 w-4" />} title="Platform admin — create hospital tenant" description="Creates a tenant, first admin membership, default departments, modules, and trial subscription.">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -256,7 +266,8 @@ export default function AdminSuite() {
             <Field label="First admin email" value={hospitalForm.adminEmail} onChange={(adminEmail) => setHospitalForm((f) => ({ ...f, adminEmail }))} />
             <Field label="First admin name" value={hospitalForm.adminName} onChange={(adminName) => setHospitalForm((f) => ({ ...f, adminName }))} />
           </div>
-          <Button disabled={isBusy || !hospitalForm.name || !hospitalForm.adminEmail} onClick={() => run("Hospital created", () => rpc("create_hospital", { p_name: hospitalForm.name, p_slug: hospitalForm.slug, p_admin_email: hospitalForm.adminEmail, p_admin_name: hospitalForm.adminName || "Hospital Admin" }))}>
+          <Button disabled={isBusy || isLoadingData || !hospitalForm.name || !hospitalForm.adminEmail} onClick={() => run("Hospital created", () => rpc("create_hospital", { p_name: hospitalForm.name, p_slug: hospitalForm.slug, p_admin_email: hospitalForm.adminEmail, p_admin_name: hospitalForm.adminName || "Hospital Admin" }))}>
+            {isBusy && <Spinner className="mr-2" />}
             Create hospital
           </Button>
           <DataList rows={data.tenants ?? []} columns={["name", "slug", "status", "plan_code"]} />
@@ -275,7 +286,10 @@ export default function AdminSuite() {
             <div className="md:col-span-2"><Field label="Address" value={settingsForm.address} onChange={(address) => setSettingsForm((f) => ({ ...f, address }))} /></div>
           </div>
           <Textarea value={settingsForm.reportFooter} onChange={(event) => setSettingsForm((f) => ({ ...f, reportFooter: event.target.value }))} placeholder="Report footer / legal note" />
-          <Button disabled={isBusy} onClick={() => run("Hospital settings saved", () => rpc("upsert_tenant_settings", { p_tenant_id: tenant.id, p_settings: settingsForm }))}>Save settings</Button>
+          <Button disabled={isBusy || isLoadingData} onClick={() => run("Hospital settings saved", () => rpc("upsert_tenant_settings", { p_tenant_id: tenant.id, p_settings: settingsForm }))}>
+            {isBusy && <Spinner className="mr-2" />}
+            Save settings
+          </Button>
         </Section>
       )}
 
@@ -288,7 +302,10 @@ export default function AdminSuite() {
             <SelectBox label="Department" value={staffForm.departmentId} values={["none", ...departments.map((d) => d.id)]} labels={{ none: "None", ...Object.fromEntries(departments.map((d) => [d.id, d.name])) }} onChange={(departmentId) => setStaffForm((f) => ({ ...f, departmentId }))} />
             <SelectBox label="Doctor profile" value={staffForm.doctorId} values={["none", ...Object.values(state.doctors).map((d) => d.id)]} labels={{ none: "None", ...Object.fromEntries(Object.values(state.doctors).map((d) => [d.id, d.name])) }} onChange={(doctorId) => setStaffForm((f) => ({ ...f, doctorId }))} />
           </div>
-          <Button disabled={isBusy || !staffForm.email || !staffForm.name} onClick={() => run("Staff invited", () => rpc("invite_staff", { p_tenant_id: tenant.id, p_email: staffForm.email, p_name: staffForm.name, p_role: staffForm.role, p_department_id: staffForm.departmentId === "none" ? null : staffForm.departmentId, p_doctor_id: staffForm.doctorId === "none" ? null : staffForm.doctorId }))}>Invite / update staff</Button>
+          <Button disabled={isBusy || isLoadingData || !staffForm.email || !staffForm.name} onClick={() => run("Staff invited", () => rpc("invite_staff", { p_tenant_id: tenant.id, p_email: staffForm.email, p_name: staffForm.name, p_role: staffForm.role, p_department_id: staffForm.departmentId === "none" ? null : staffForm.departmentId, p_doctor_id: staffForm.doctorId === "none" ? null : staffForm.doctorId }))}>
+            {isBusy && <Spinner className="mr-2" />}
+            Invite / update staff
+          </Button>
           <DataList rows={data.tenant_memberships ?? []} columns={["display_name", "email", "role", "department_id", "doctor_id"]} />
         </Section>
       )}
@@ -308,7 +325,10 @@ export default function AdminSuite() {
             <Field label="Bed" value={patientForm.bed} onChange={(bed) => setPatientForm((f) => ({ ...f, bed }))} />
             <div className="md:col-span-2"><Field label="Address" value={patientForm.address} onChange={(address) => setPatientForm((f) => ({ ...f, address }))} /></div>
           </div>
-          <Button disabled={isBusy || !patientForm.name} onClick={() => run("Patient registered", () => rpc("register_patient", { p_tenant_id: tenant.id, p_patient: { ...patientForm, age: Number(patientForm.age || 0) } }))}>Register / update patient</Button>
+          <Button disabled={isBusy || isLoadingData || !patientForm.name} onClick={() => run("Patient registered", () => rpc("register_patient", { p_tenant_id: tenant.id, p_patient: { ...patientForm, age: Number(patientForm.age || 0) } }))}>
+            {isBusy && <Spinner className="mr-2" />}
+            Register / update patient
+          </Button>
         </Section>
       )}
 
@@ -324,7 +344,10 @@ export default function AdminSuite() {
             <Field label="TAT hours" value={catalogForm.turnaroundHours} onChange={(turnaroundHours) => setCatalogForm((f) => ({ ...f, turnaroundHours }))} />
             <Field label="Instructions" value={catalogForm.instructions} onChange={(instructions) => setCatalogForm((f) => ({ ...f, instructions }))} />
           </div>
-          <Button disabled={isBusy || !catalogForm.name} onClick={() => run("Catalog item saved", () => rpc("upsert_catalog_item", { p_tenant_id: tenant.id, p_item: { ...catalogForm, price: Number(catalogForm.price || 0), turnaroundHours: Number(catalogForm.turnaroundHours || 24), active: true } }))}>Save test</Button>
+          <Button disabled={isBusy || isLoadingData || !catalogForm.name} onClick={() => run("Catalog item saved", () => rpc("upsert_catalog_item", { p_tenant_id: tenant.id, p_item: { ...catalogForm, price: Number(catalogForm.price || 0), turnaroundHours: Number(catalogForm.turnaroundHours || 24), active: true } }))}>
+            {isBusy && <Spinner className="mr-2" />}
+            Save test
+          </Button>
           <DataList rows={data.investigation_catalog ?? []} columns={["code", "name", "department_id", "price", "turnaround_hours", "active"]} />
         </Section>
       )}
@@ -332,7 +355,10 @@ export default function AdminSuite() {
       {canBill && (
         <Section icon={<Receipt className="h-4 w-4" />} title="Billing MVP" description="Generate invoice items from investigation orders and track payment foundations.">
           <SelectBox label="Investigation" value={billingInvestigationId || "none"} values={["none", ...investigations.map((i) => i.id)]} labels={{ none: "Select investigation", ...Object.fromEntries(investigations.map((i) => [i.id, `${i.type} · ${state.patients[i.patientId]?.name ?? i.patientId}`])) }} onChange={(value) => setBillingInvestigationId(value === "none" ? "" : value)} />
-          <Button disabled={isBusy || !billingInvestigationId} onClick={() => run("Invoice generated", () => rpc("create_invoice_for_investigation", { p_tenant_id: tenant.id, p_investigation_id: billingInvestigationId }))}>Generate invoice</Button>
+          <Button disabled={isBusy || isLoadingData || !billingInvestigationId} onClick={() => run("Invoice generated", () => rpc("create_invoice_for_investigation", { p_tenant_id: tenant.id, p_investigation_id: billingInvestigationId }))}>
+            {isBusy && <Spinner className="mr-2" />}
+            Generate invoice
+          </Button>
           <DataList rows={data.invoices ?? []} columns={["id", "patient_id", "status", "total", "payment_status", "created_at"]} />
         </Section>
       )}
@@ -347,7 +373,10 @@ export default function AdminSuite() {
             <Field label="Manufacturer" value={medicineForm.manufacturer} onChange={(manufacturer) => setMedicineForm((f) => ({ ...f, manufacturer }))} />
             <Field label="Reorder" value={medicineForm.reorderLevel} onChange={(reorderLevel) => setMedicineForm((f) => ({ ...f, reorderLevel }))} />
           </div>
-          <Button disabled={isBusy || !medicineForm.genericName} onClick={() => run("Medicine saved", () => rpc("upsert_medicine", { p_tenant_id: tenant.id, p_item: { ...medicineForm, reorderLevel: Number(medicineForm.reorderLevel || 0), active: true } }))}>Save medicine</Button>
+          <Button disabled={isBusy || isLoadingData || !medicineForm.genericName} onClick={() => run("Medicine saved", () => rpc("upsert_medicine", { p_tenant_id: tenant.id, p_item: { ...medicineForm, reorderLevel: Number(medicineForm.reorderLevel || 0), active: true } }))}>
+            {isBusy && <Spinner className="mr-2" />}
+            Save medicine
+          </Button>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-3 border-t pt-3">
             <SelectBox label="Medicine" value={stockForm.medicineId || "none"} values={["none", ...(data.medicines ?? []).map((m) => m.id)]} labels={{ none: "Select medicine", ...Object.fromEntries((data.medicines ?? []).map((m) => [m.id, m.brand_name || m.generic_name])) }} onChange={(medicineId) => setStockForm((f) => ({ ...f, medicineId: medicineId === "none" ? "" : medicineId }))} />
             <Field label="Batch" value={stockForm.batchNumber} onChange={(batchNumber) => setStockForm((f) => ({ ...f, batchNumber }))} />
@@ -355,7 +384,10 @@ export default function AdminSuite() {
             <Field label="Quantity" value={stockForm.quantity} onChange={(quantity) => setStockForm((f) => ({ ...f, quantity }))} />
             <Field label="Selling price" value={stockForm.sellingPrice} onChange={(sellingPrice) => setStockForm((f) => ({ ...f, sellingPrice }))} />
           </div>
-          <Button disabled={isBusy || !stockForm.medicineId} onClick={() => run("Stock adjusted", () => rpc("adjust_stock", { p_tenant_id: tenant.id, p_batch: { ...stockForm, quantity: Number(stockForm.quantity || 0), sellingPrice: Number(stockForm.sellingPrice || 0), storeId: "STORE-MAIN" } }))}>Adjust stock</Button>
+          <Button disabled={isBusy || isLoadingData || !stockForm.medicineId} onClick={() => run("Stock adjusted", () => rpc("adjust_stock", { p_tenant_id: tenant.id, p_batch: { ...stockForm, quantity: Number(stockForm.quantity || 0), sellingPrice: Number(stockForm.sellingPrice || 0), storeId: "STORE-MAIN" } }))}>
+            {isBusy && <Spinner className="mr-2" />}
+            Adjust stock
+          </Button>
           <DataList rows={data.medicines ?? []} columns={["generic_name", "brand_name", "strength", "dosage_form", "reorder_level"]} />
         </Section>
       )}
@@ -402,6 +434,25 @@ function Metric({ title, value, icon }: { title: string; value: React.ReactNode;
         <div>
           <div className="text-lg font-semibold leading-tight">{value}</div>
           <div className="text-xs text-muted-foreground">{title}</div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function LoadingPanel({ label }: { label: string }) {
+  return (
+    <Card>
+      <CardContent className="p-4 flex flex-col gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Spinner />
+          <span>{label}</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <Skeleton className="h-10" />
+          <Skeleton className="h-10" />
+          <Skeleton className="h-10" />
+          <Skeleton className="h-10" />
         </div>
       </CardContent>
     </Card>

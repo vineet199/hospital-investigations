@@ -19,11 +19,12 @@ Run the migrations in `supabase/migrations` in order in the Supabase SQL editor,
 
 1. `001_multitenant_supabase.sql`
 2. `002_onboarding_and_operations.sql`
+3. `004_security_hardening.sql`
 
 Optional cleanup migration/script for removing demo data before real onboarding:
 
 - SQL: `supabase/migrations/003_remove_demo_seed_data.sql`
-- Script: `pnpm unseed:supabase`
+- Script: `pnpm unseed:supabase:confirm`
 
 The migration creates:
 
@@ -53,7 +54,7 @@ The seed script reads your local `.env` file automatically.
 To remove the demo hospitals and demo auth users later, run:
 
 ```bash
-pnpm unseed:supabase
+pnpm unseed:supabase:confirm
 ```
 
 Demo users:
@@ -106,6 +107,7 @@ Run these checks after changing migrations, adapters, or onboarding flows:
 ```bash
 pnpm typecheck
 pnpm test
+pnpm security:check
 pnpm build
 ```
 

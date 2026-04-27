@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Select,
   SelectContent,
@@ -472,7 +473,7 @@ function FullPageMessage({ title }: { title: string }) {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <div className="flex items-center gap-3 text-muted-foreground">
-        <Activity className="h-5 w-5 text-primary animate-pulse" />
+        <Spinner className="h-5 w-5 text-primary" />
         <span className="text-sm font-medium">{title}</span>
       </div>
     </div>
@@ -603,6 +604,7 @@ function LoginScreen({
               />
             </div>
             <Button type="submit" disabled={isLoading}>
+              {isLoading && <Spinner className="mr-2" />}
               {isLoading ? "Signing in…" : "Sign in"}
             </Button>
           </form>

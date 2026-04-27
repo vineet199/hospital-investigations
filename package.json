@@ -13,8 +13,11 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "security:check": "node scripts/security-check.mjs",
+    "audit:deps": "pnpm audit --audit-level high",
     "seed:supabase": "node scripts/seed-supabase-demo-users.mjs",
-    "unseed:supabase": "node scripts/remove-supabase-demo-data.mjs"
+    "unseed:supabase": "node scripts/remove-supabase-demo-data.mjs",
+    "unseed:supabase:confirm": "node scripts/remove-supabase-demo-data.mjs --confirm"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4"

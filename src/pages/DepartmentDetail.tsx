@@ -3,6 +3,7 @@ import { useParams, Link } from "wouter";
 import { useAppStore } from "@/store/AppStore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { PriorityBadge, StatusBadge } from "@/components/Badges";
 import { StatusStepper } from "@/components/StatusStepper";
@@ -160,6 +161,7 @@ export default function DepartmentDetail() {
                   className="min-h-[72px] text-sm"
                 />
                 <Button size="sm" variant="outline" onClick={() => saveResult(inv.id)} disabled={!canUpdateDepartment || isLoading}>
+                  {isLoading && <Spinner className="mr-2" />}
                   <ClipboardCheck className="h-3.5 w-3.5 mr-1" /> Update Result
                 </Button>
               </div>
@@ -180,6 +182,7 @@ export default function DepartmentDetail() {
                   className="min-h-[72px] text-sm"
                 />
                 <Button size="sm" onClick={() => saveResult(inv.id)} disabled={!canUpdateDepartment || isLoading}>
+                  {isLoading && <Spinner className="mr-2" />}
                   <ClipboardCheck className="h-3.5 w-3.5 mr-1" /> Save Result & Mark Ready
                 </Button>
               </div>
@@ -191,6 +194,7 @@ export default function DepartmentDetail() {
             empty="No new investigations waiting."
             renderActions={(inv) => (
               <Button size="sm" variant="outline" onClick={() => advance(inv.id, "In Progress")} disabled={!canUpdateDepartment || isLoading}>
+                {isLoading && <Spinner className="mr-2" />}
                 <PlayCircle className="h-3.5 w-3.5 mr-1" /> Start Processing
               </Button>
             )}

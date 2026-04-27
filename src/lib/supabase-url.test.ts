@@ -12,8 +12,8 @@ describe("normalizeSupabaseUrl", () => {
   });
 
   it("derives project URL from a Supabase dashboard URL", () => {
-    expect(normalizeSupabaseUrl("https://supabase.com/dashboard/project/peqfaiwioohgrsevoqju/settings/api")).toBe(
-      "https://peqfaiwioohgrsevoqju.supabase.co",
+    expect(normalizeSupabaseUrl("https://supabase.com/dashboard/project/abcdefghijklmnopqrst/settings/api")).toBe(
+      "https://abcdefghijklmnopqrst.supabase.co",
     );
   });
 

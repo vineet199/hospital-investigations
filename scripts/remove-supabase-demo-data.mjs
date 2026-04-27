@@ -49,6 +49,17 @@ if (!supabaseUrl || !serviceRoleKey) {
   process.exit(1);
 }
 
+if (!process.argv.includes("--confirm")) {
+  console.error("Refusing to remove demo data without explicit confirmation.");
+  console.error("Run: pnpm unseed:supabase:confirm");
+  process.exit(1);
+}
+
+if (process.env.SUPABASE_ENV === "production" && process.env.CONFIRM_PRODUCTION_UNSEED !== "remove-demo-data") {
+  console.error("Refusing to run demo cleanup against SUPABASE_ENV=production without CONFIRM_PRODUCTION_UNSEED=remove-demo-data.");
+  process.exit(1);
+}
+
 const admin = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });

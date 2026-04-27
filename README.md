@@ -34,6 +34,12 @@ pnpm test
 
 Current tests cover Supabase URL normalization, including accidental `/rest/v1` or `/auth/v1` URLs and Supabase Dashboard URLs. Add new adapter contract tests whenever another database provider is implemented.
 
+Run the lightweight secret/security scan before committing:
+
+```bash
+pnpm security:check
+```
+
 ## Current foundation
 
 Implemented foundation:
