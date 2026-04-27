@@ -11,6 +11,8 @@ For production hospital SaaS deployments, prefer Cloudflare Pages, Vercel, Netli
 - Build output: `dist/public`
 - SPA fallback: `dist/public/404.html` copied from `index.html`
 
+The GitHub Actions workflow uses the `packageManager` value in `package.json` for the pnpm version. Do not also specify a separate pnpm version in the workflow, or GitHub Actions can fail with `ERR_PNPM_BAD_PM_VERSION`.
+
 ## 1. Prepare Supabase
 
 Use a demo or staging Supabase project, not production.
