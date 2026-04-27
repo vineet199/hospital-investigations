@@ -1,12 +1,23 @@
 export type Priority = "Routine" | "Urgent" | "Stat";
 export type Status = "Ordered" | "Sent to Department" | "In Progress" | "Result Ready" | "Reviewed by Doctor";
-export type UserRole = "Admin" | "Doctor" | "Nurse" | "Technician" | "Department Head" | "Billing" | "Reception";
+export type UserRole =
+  | "Platform Admin"
+  | "Admin"
+  | "Doctor"
+  | "Nurse"
+  | "Technician"
+  | "Department Head"
+  | "Pharmacist"
+  | "Billing"
+  | "Reception";
 
 export interface Tenant {
   id: string;
   slug: string;
   name: string;
   logoUrl?: string;
+  status?: string;
+  planCode?: string;
 }
 
 export interface Patient {
@@ -17,6 +28,10 @@ export interface Patient {
   gender: "Male" | "Female" | "Other";
   ward: string;
   bed: string;
+  phone?: string;
+  address?: string;
+  patientClass?: string;
+  active?: boolean;
 }
 
 export interface Doctor {

@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
 import { useAppStore } from "@/store/AppStore";
-import { LayoutDashboard, Users, Building2, History, Activity, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Building2, History, Activity, LogOut, Settings, Receipt, Pill, Printer, ShieldCheck } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -23,6 +23,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { name: "Patients", href: "/patients", icon: Users },
     { name: "Departments", href: "/departments", icon: Building2 },
     { name: "History", href: "/history", icon: History },
+    ...(user.role === "Admin" || user.role === "Platform Admin"
+      ? [{ name: "Admin", href: "/admin", icon: Settings }]
+      : []),
+    ...(user.role === "Admin" || user.role === "Platform Admin" || user.role === "Billing" || user.role === "Reception"
+      ? [{ name: "Billing", href: "/billing", icon: Receipt }]
+      : []),
+    ...(user.role === "Admin" || user.role === "Platform Admin" || user.role === "Pharmacist"
+      ? [{ name: "Pharmacy", href: "/pharmacy", icon: Pill }]
+      : []),
+    { name: "Reports", href: "/reports", icon: Printer },
+    ...(user.role === "Admin" || user.role === "Platform Admin"
+      ? [{ name: "Audit", href: "/audit", icon: ShieldCheck }]
+      : []),
   ];
 
   return (

@@ -2,6 +2,8 @@
 
 This app now uses Supabase Auth + Postgres instead of the local SQLite API server.
 
+For the full product roadmap, onboarding plan, role matrix, and commercial SaaS phases, see [`README.md`](./README.md).
+
 ## 1. Create a Supabase project
 
 Create a project at <https://supabase.com>, then copy:
@@ -13,7 +15,15 @@ Put them in a local `.env` file based on `.env.example`.
 
 ## 2. Apply the schema
 
-Run `supabase/migrations/001_multitenant_supabase.sql` in the Supabase SQL editor, or apply it through the Supabase CLI.
+Run the migrations in `supabase/migrations` in order in the Supabase SQL editor, or apply them through the Supabase CLI.
+
+1. `001_multitenant_supabase.sql`
+2. `002_onboarding_and_operations.sql`
+
+Optional cleanup migration/script for removing demo data before real onboarding:
+
+- SQL: `supabase/migrations/003_remove_demo_seed_data.sql`
+- Script: `pnpm unseed:supabase`
 
 The migration creates:
 
@@ -40,8 +50,15 @@ pnpm seed:supabase
 
 The seed script reads your local `.env` file automatically.
 
+To remove the demo hospitals and demo auth users later, run:
+
+```bash
+pnpm unseed:supabase
+```
+
 Demo users:
 
+- Platform admin: `platform@hims-saas.demo`
 - `doctor@city-general.demo`
 - `nurse@city-general.demo`
 - `lab@city-general.demo`
@@ -54,7 +71,26 @@ Demo users:
 
 All demo passwords are `demo123`.
 
-## 4. Run the app
+If platform admin login fails, confirm that `002_onboarding_and_operations.sql` has been applied and rerun:
+
+```bash
+pnpm seed:supabase
+```
+
+That command creates the `platform@hims-saas.demo` Auth user and links it to `public.platform_admins`.
+
+## 4. Onboard a real hospital
+
+Use the SaaS platform admin account, not a hospital account:
+
+1. Sign in with `platform@hims-saas.demo` / `demo123` and select `SaaS Platform Admin`.
+2. Open `/admin`.
+3. Use **Platform admin — create hospital tenant** to create a hospital such as Manipal.
+4. The RPC creates the tenant, settings, branding placeholder, trial subscription, enabled modules, default departments, and first hospital admin membership.
+5. Create/invite the first hospital admin as a Supabase Auth user using your service role/admin process.
+6. Give the hospital admin only their hospital credentials. You do not need City General or any other hospital’s credentials.
+
+## 5. Run the app
 
 ```bash
 pnpm install
@@ -62,3 +98,15 @@ pnpm dev
 ```
 
 The frontend talks directly to Supabase. The legacy `server/index.mjs` SQLite API is no longer used by `pnpm dev`.
+
+## 6. Validation
+
+Run these checks after changing migrations, adapters, or onboarding flows:
+
+```bash
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+The frontend is wired through `src/lib/database`. Supabase is the implemented adapter, but additional adapters can be added for hospitals that require another backend.

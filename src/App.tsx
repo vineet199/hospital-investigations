@@ -11,6 +11,7 @@ import PatientDetail from "@/pages/PatientDetail";
 import Departments from "@/pages/Departments";
 import DepartmentDetail from "@/pages/DepartmentDetail";
 import HistoryPage from "@/pages/HistoryPage";
+import AdminSuite from "@/pages/AdminSuite";
 
 const queryClient = new QueryClient();
 
@@ -24,6 +25,11 @@ function Router() {
         <Route path="/departments" component={Departments} />
         <Route path="/departments/:id" component={DepartmentDetail} />
         <Route path="/history" component={HistoryPage} />
+        <Route path="/admin" component={AdminSuite} />
+        <Route path="/billing" component={AdminSuite} />
+        <Route path="/pharmacy" component={AdminSuite} />
+        <Route path="/reports" component={AdminSuite} />
+        <Route path="/audit" component={AdminSuite} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>

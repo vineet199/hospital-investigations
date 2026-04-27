@@ -782,6 +782,13 @@ export default function PatientDetail() {
                         <Send className="h-3.5 w-3.5 mr-1" /> Send to {dept?.name}
                       </Button>
                     )}
+                    {!["Ordered", "Reviewed by Doctor"].includes(inv.status) && (
+                      <Link href={`/departments/${inv.departmentId}`}>
+                        <Button size="sm" variant="outline">
+                          Open {dept?.name ?? "department"} workbench
+                        </Button>
+                      </Link>
+                    )}
                     {inv.status === "Result Ready" && (
                       <Button
                         size="sm"

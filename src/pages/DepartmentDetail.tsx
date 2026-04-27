@@ -84,13 +84,13 @@ export default function DepartmentDetail() {
   };
 
   const saveResult = async (id: string) => {
-    const notes = (resultDrafts[id] ?? "").trim();
+    const inv = state.investigations[id];
+    if (!inv) return;
+    const notes = (resultDrafts[id] ?? inv.resultNotes ?? "").trim();
     if (!notes) {
       toast.error("Add result notes before saving.");
       return;
     }
-    const inv = state.investigations[id];
-    if (!inv) return;
     try {
       await dispatch({
         type: "ADD_RESULT_NOTES",
@@ -103,7 +103,7 @@ export default function DepartmentDetail() {
       toast.success("Result saved.");
       setResultDrafts((d) => ({ ...d, [id]: "" }));
     } catch {
-      // Error toast is shown by the API-backed store.
+      // Error toast is shown by the Supabase-backed store.
     }
   };
 
@@ -180,7 +180,7 @@ export default function DepartmentDetail() {
                   className="min-h-[72px] text-sm"
                 />
                 <Button size="sm" onClick={() => saveResult(inv.id)} disabled={!canUpdateDepartment || isLoading}>
-                  <ClipboardCheck className="h-3.5 w-3.5 mr-1" /> Save Result
+                  <ClipboardCheck className="h-3.5 w-3.5 mr-1" /> Save Result & Mark Ready
                 </Button>
               </div>
             )}
@@ -191,7 +191,7 @@ export default function DepartmentDetail() {
             empty="No new investigations waiting."
             renderActions={(inv) => (
               <Button size="sm" variant="outline" onClick={() => advance(inv.id, "In Progress")} disabled={!canUpdateDepartment || isLoading}>
-                <PlayCircle className="h-3.5 w-3.5 mr-1" /> Start
+                <PlayCircle className="h-3.5 w-3.5 mr-1" /> Start Processing
               </Button>
             )}
           />

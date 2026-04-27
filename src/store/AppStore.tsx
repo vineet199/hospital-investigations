@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { databaseAdapter } from "@/lib/database";
 import type { AppState, AppUser, Investigation, Status, Tenant, UserRole } from "./types";
 
 type Action =
@@ -51,6 +51,15 @@ interface AppContextType {
 }
 
 const TENANT_STORAGE_KEY = "hospital-investigations-tenant-slug";
+const PLATFORM_TENANT_ID = "00000000-0000-0000-0000-000000000000";
+
+const platformTenant: Tenant = {
+  id: PLATFORM_TENANT_ID,
+  slug: "platform",
+  name: "SaaS Platform Admin",
+  status: "active",
+  planCode: "enterprise",
+};
 
 const emptyState: AppState = {
   patients: {},
@@ -63,10 +72,10 @@ const emptyState: AppState = {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 function getClient() {
-  if (!supabase) {
-    throw new Error("Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.");
+  if (!databaseAdapter.isConfigured) {
+    throw new Error(`Database provider "${databaseAdapter.provider}" is not configured. Check .env and provider adapter setup.`);
   }
-  return supabase;
+  return databaseAdapter;
 }
 
 function getErrorMessage(error: unknown, fallback = "Supabase request failed.") {
@@ -110,6 +119,8 @@ function tenantFromEmbedded(row: any): Tenant {
     slug: rawTenant.slug,
     name: rawTenant.name,
     logoUrl: rawTenant.logo_url ?? undefined,
+    status: rawTenant.status ?? undefined,
+    planCode: rawTenant.plan_code ?? undefined,
   };
 }
 
@@ -118,25 +129,52 @@ async function claimMembershipByEmail(email?: string | null) {
   const client = getClient();
   // This safely links seeded membership rows to the signed-in Supabase Auth user.
   // It only succeeds when the requested email matches the authenticated JWT email.
-  const result = await client.rpc("claim_membership_by_email", { p_email: email });
-  assertSupabaseResult(result);
+  await client.callFunction("claim_membership_by_email", { p_email: email });
+}
+
+async function loadPlatformAdmin(userId: string, email?: string | null) {
+  const client = getClient();
+  let row: any | null;
+  try {
+    row = await client.selectMaybeSingle("platform_admins", {
+      select: "user_id,email,display_name",
+      eq: { user_id: userId },
+    });
+  } catch {
+    return null;
+  }
+  if (!row) return null;
+
+  const appUser: AppUser = {
+    id: userId,
+    tenantId: platformTenant.id,
+    email: row.email ?? email ?? "",
+    name: row.display_name ?? "Platform Admin",
+    role: "Platform Admin",
+  };
+
+  return { tenant: platformTenant, user: appUser };
 }
 
 async function loadMembership(userId: string, preferredTenantSlug?: string | null, email?: string | null) {
   await claimMembershipByEmail(email);
 
-  const client = getClient();
-  const result = await client
-    .from("tenant_memberships")
-    .select(
-      "tenant_id,email,display_name,role,department_id,doctor_id,created_at,tenants!inner(id,slug,name,logo_url)",
-    )
-    .eq("user_id", userId)
-    .order("created_at", { ascending: true });
+  if (preferredTenantSlug === "platform") {
+    const platformMembership = await loadPlatformAdmin(userId, email);
+    if (platformMembership) return platformMembership;
+  }
 
-  assertSupabaseResult(result);
-  const memberships = ((result.data ?? []) as any[]).filter(Boolean);
+  const client = getClient();
+  const memberships = (
+    await client.selectRows<any>("tenant_memberships", {
+      select: "tenant_id,email,display_name,role,department_id,doctor_id,created_at,tenants!inner(id,slug,name,logo_url,status,plan_code)",
+      eq: { user_id: userId },
+      order: { column: "created_at", ascending: true },
+    })
+  ).filter(Boolean);
   if (memberships.length === 0) {
+    const platformMembership = await loadPlatformAdmin(userId, email);
+    if (platformMembership) return platformMembership;
     throw new Error("No hospital membership found for this account. Create or link a tenant_memberships row first.");
   }
 
@@ -162,32 +200,32 @@ async function loadMembership(userId: string, preferredTenantSlug?: string | nul
 }
 
 async function fetchAppState(tenantId: string, user?: AppUser | null): Promise<AppState> {
-  const client = getClient();
-  const [departmentsResult, doctorsResult, patientsResult, investigationsResult, eventsResult] = await Promise.all([
-    client.from("departments").select("id,name").eq("tenant_id", tenantId).order("name"),
-    client.from("doctors").select("id,name,department").eq("tenant_id", tenantId).order("name"),
-    client.from("patients").select("id,mrn,name,age,gender,ward,bed").eq("tenant_id", tenantId).order("name"),
-    client
-      .from("investigations")
-      .select("id,patient_id,ordered_by_doctor_id,type,notes,priority,department_id,technician,status,result_notes,created_at")
-      .eq("tenant_id", tenantId)
-      .order("created_at", { ascending: false }),
-    client
-      .from("timeline_events")
-      .select("investigation_id,stage,timestamp,actor")
-      .eq("tenant_id", tenantId)
-      .order("timestamp", { ascending: true }),
-  ]);
-
-  for (const result of [departmentsResult, doctorsResult, patientsResult, investigationsResult, eventsResult]) {
-    assertSupabaseResult(result);
+  if (tenantId === PLATFORM_TENANT_ID || user?.role === "Platform Admin") {
+    return emptyState;
   }
 
-  const departments = (departmentsResult.data ?? []) as any[];
-  const doctors = (doctorsResult.data ?? []) as any[];
-  const patients = (patientsResult.data ?? []) as any[];
-  const investigations = (investigationsResult.data ?? []) as any[];
-  const events = (eventsResult.data ?? []) as any[];
+  const client = getClient();
+  const [departmentsResult, doctorsResult, patientsResult, investigationsResult, eventsResult] = await Promise.all([
+    client.selectRows<any>("departments", { select: "id,name", eq: { tenant_id: tenantId }, order: { column: "name" } }),
+    client.selectRows<any>("doctors", { select: "id,name,department", eq: { tenant_id: tenantId }, order: { column: "name" } }),
+    client.selectRows<any>("patients", { select: "id,mrn,name,age,gender,ward,bed", eq: { tenant_id: tenantId }, order: { column: "name" } }),
+    client.selectRows<any>("investigations", {
+      select: "id,patient_id,ordered_by_doctor_id,type,notes,priority,department_id,technician,status,result_notes,created_at",
+      eq: { tenant_id: tenantId },
+      order: { column: "created_at", ascending: false },
+    }),
+    client.selectRows<any>("timeline_events", {
+      select: "investigation_id,stage,timestamp,actor",
+      eq: { tenant_id: tenantId },
+      order: { column: "timestamp", ascending: true },
+    }),
+  ]);
+
+  const departments = departmentsResult as any[];
+  const doctors = doctorsResult as any[];
+  const patients = patientsResult as any[];
+  const investigations = investigationsResult as any[];
+  const events = eventsResult as any[];
 
   const timelineByInvestigation = new Map<string, { stage: Status; timestamp: string; actor: string }[]>();
   for (const event of events) {
@@ -266,16 +304,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     async function restoreSession() {
-      if (!isSupabaseConfigured) {
+      if (!databaseAdapter.isConfigured) {
         setAuthLoading(false);
         return;
       }
 
       try {
         const client = getClient();
-        const { data, error } = await client.auth.getSession();
-        if (error) throw error;
-        const authUser = data.session?.user;
+        const authUser = await client.getCurrentUser();
         if (!authUser) {
           if (!cancelled) clearAuth();
           return;
@@ -284,7 +320,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         console.error(error);
         if (!cancelled) {
-          await supabase?.auth.signOut().catch(() => undefined);
+          await databaseAdapter.signOut().catch(() => undefined);
           clearAuth();
           toast.error(error instanceof Error ? error.message : "Unable to restore Supabase session.");
         }
@@ -304,16 +340,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       try {
         const client = getClient();
-        const { data, error } = await client.auth.signInWithPassword({
-          email: email.trim().toLowerCase(),
-          password,
-        });
-        if (error) throw error;
-        if (!data.user) throw new Error("Supabase did not return an authenticated user.");
-        const membership = await loadWorkspace(data.user.id, data.user.email, tenantSlug);
+        const authUser = await client.signInWithPassword(email.trim().toLowerCase(), password);
+        const membership = await loadWorkspace(authUser.id, authUser.email, tenantSlug);
         toast.success(`Signed in to ${membership.tenant.name} as ${membership.user.name}`);
       } catch (error) {
-        await supabase?.auth.signOut().catch(() => undefined);
+        await databaseAdapter.signOut().catch(() => undefined);
         clearAuth();
         throw error;
       } finally {
@@ -324,7 +355,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    await supabase?.auth.signOut().catch(() => undefined);
+    await databaseAdapter.signOut().catch(() => undefined);
     clearAuth();
     toast.success("Signed out.");
   }, [clearAuth]);
@@ -332,7 +363,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const can = useCallback(
     (permission: Permission, departmentId?: string) => {
       if (!user) return false;
-      if (user.role === "Admin") return true;
+      if (user.role === "Admin" || user.role === "Platform Admin") return true;
 
       switch (permission) {
         case "createOrders":
@@ -372,37 +403,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const client = getClient();
       setIsLoading(true);
       try {
-        let result: { error: unknown };
         switch (action.type) {
           case "ADD_INVESTIGATIONS":
-            result = await client.rpc("create_investigations", {
+            await client.callFunction("create_investigations", {
               p_tenant_id: tenant.id,
               p_investigations: action.payload,
             });
             break;
           case "SEND_TO_DEPARTMENT":
-            result = await client.rpc("send_to_department", {
+            await client.callFunction("send_to_department", {
               p_tenant_id: tenant.id,
               p_investigation_id: action.payload.id,
               p_technician: action.payload.technician ?? null,
             });
             break;
           case "ADVANCE_STATUS":
-            result = await client.rpc("advance_investigation", {
+            await client.callFunction("advance_investigation", {
               p_tenant_id: tenant.id,
               p_investigation_id: action.payload.id,
               p_status: action.payload.status,
             });
             break;
           case "ADD_RESULT_NOTES":
-            result = await client.rpc("save_result", {
+            await client.callFunction("save_result", {
               p_tenant_id: tenant.id,
               p_investigation_id: action.payload.id,
               p_notes: action.payload.notes,
             });
             break;
           case "MARK_REVIEWED":
-            result = await client.rpc("mark_reviewed", {
+            await client.callFunction("mark_reviewed", {
               p_tenant_id: tenant.id,
               p_investigation_id: action.payload.id,
             });
@@ -410,7 +440,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           default:
             return;
         }
-        assertSupabaseResult(result);
         const nextState = await fetchAppState(tenant.id, user);
         setState((previous) => ({ ...nextState, currentDoctorId: previous.currentDoctorId || nextState.currentDoctorId }));
       } catch (error) {
@@ -483,22 +512,26 @@ function LoginScreen({
   const [email, setEmail] = useState("doctor@city-general.demo");
   const [password, setPassword] = useState("demo123");
 
-  if (!isSupabaseConfigured) return <SetupRequiredScreen />;
+  if (!databaseAdapter.isConfigured) return <SetupRequiredScreen />;
 
   const tenantOptions = [
+    { slug: "platform", name: "SaaS Platform Admin" },
     { slug: "city-general", name: "City General Hospital" },
     { slug: "sunrise-medical", name: "Sunrise Medical Center" },
   ];
 
   const demoUsers = [
+    { label: "SaaS Platform Admin", tenantSlug: "platform", email: "platform@hims-saas.demo" },
     { label: "City Doctor", tenantSlug: "city-general", email: "doctor@city-general.demo" },
     { label: "City Nurse", tenantSlug: "city-general", email: "nurse@city-general.demo" },
     { label: "City Pathology Tech", tenantSlug: "city-general", email: "lab@city-general.demo" },
     { label: "City Radiology Tech", tenantSlug: "city-general", email: "radiology@city-general.demo" },
+    { label: "City Pharmacist", tenantSlug: "city-general", email: "pharmacist@city-general.demo" },
     { label: "City Admin", tenantSlug: "city-general", email: "admin@city-general.demo" },
     { label: "Sunrise Doctor", tenantSlug: "sunrise-medical", email: "doctor@sunrise.demo" },
     { label: "Sunrise Nurse", tenantSlug: "sunrise-medical", email: "nurse@sunrise.demo" },
     { label: "Sunrise Lab Tech", tenantSlug: "sunrise-medical", email: "lab@sunrise.demo" },
+    { label: "Sunrise Pharmacist", tenantSlug: "sunrise-medical", email: "pharmacist@sunrise.demo" },
     { label: "Sunrise Admin", tenantSlug: "sunrise-medical", email: "admin@sunrise.demo" },
   ];
 
@@ -531,8 +564,10 @@ function LoginScreen({
                 value={tenantSlug}
                 onValueChange={(slug) => {
                   setTenantSlug(slug);
-                  const doctor = demoUsers.find((demo) => demo.tenantSlug === slug && demo.label.includes("Doctor"));
-                  if (doctor) setEmail(doctor.email);
+                  const preferredDemo =
+                    demoUsers.find((demo) => demo.tenantSlug === slug && demo.label.includes("Doctor")) ??
+                    demoUsers.find((demo) => demo.tenantSlug === slug);
+                  if (preferredDemo) setEmail(preferredDemo.email);
                 }}
               >
                 <SelectTrigger>
