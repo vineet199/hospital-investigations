@@ -48,6 +48,87 @@ For a GitHub Pages demo build, use:
 pnpm build:github
 ```
 
+## Low-latency design
+
+The app now uses route-level code splitting with `React.lazy` so admin, pharmacy, billing, patient detail, and department workbench code is not all loaded in the first bundle. The Vite build also defines manual chunks for React, Supabase, query, charts, and Radix UI libraries.
+
+Database-side latency helpers live in `supabase/migrations/005_low_latency_indexes.sql`:
+
+- patient search indexes
+- investigation status/department indexes
+- timeline timestamp indexes
+- billing/pharmacy indexes
+- `get_dashboard_summary` RPC
+- `get_department_queue` RPC
+
+### How database indexing is done
+
+All performance indexes are created in an additive migration:
+
+```text
+supabase/migrations/005_low_latency_indexes.sql
+```
+
+The indexing strategy follows the most common access pattern in this SaaS: **every query is tenant-scoped first**, then filtered/sorted by the page-specific field.
+
+Examples:
+
+```sql
+create index if not exists patients_tenant_name_lower_idx
+on public.patients (tenant_id, lower(name));
+
+create index if not exists investigations_tenant_department_status_idx
+on public.investigations (tenant_id, department_id, status, created_at desc);
+
+create index if not exists timeline_events_tenant_timestamp_idx
+on public.timeline_events (tenant_id, timestamp desc);
+```
+
+Why `tenant_id` comes first:
+
+- It keeps each hospital’s data isolated in query plans.
+- It helps Postgres quickly narrow results to one hospital.
+- It matches RLS and application filters.
+
+What each index supports:
+
+| Index | Used for |
+|---|---|
+| `patients_tenant_name_lower_idx` | patient search by name inside a hospital |
+| `patients_tenant_phone_idx` | patient search by phone/contact |
+| `investigations_tenant_department_status_idx` | department queue screens: queued/in-progress/result-ready |
+| `investigations_tenant_status_created_idx` | dashboard/status summaries |
+| `timeline_events_tenant_timestamp_idx` | recent activity/history views |
+| `invoices_tenant_patient_status_idx` | billing lookup by patient/payment status |
+| `medicine_batches_tenant_medicine_expiry_idx` | pharmacy stock and expiry lookups |
+
+The migration also adds RPC helpers:
+
+```sql
+get_dashboard_summary(p_tenant_id uuid)
+get_department_queue(p_tenant_id uuid, p_department_id text)
+```
+
+These reduce network round trips by returning screen-ready data from the database in one call.
+
+When adding a new page/table, add an index based on:
+
+1. `tenant_id`
+2. the main filter column
+3. the main status/category column if applicable
+4. the sort column, usually `created_at desc` or `timestamp desc`
+
+For example, a future appointments page might use:
+
+```sql
+create index appointments_tenant_date_status_idx
+on public.appointments (tenant_id, appointment_date, status);
+```
+
+Always verify large-query performance with `EXPLAIN ANALYZE` in staging before production rollout.
+
+Next recommended latency improvements are route-level React Query data fetching, optimistic mutation updates, and realtime subscriptions scoped to a patient or department instead of broad tenant-wide refreshes.
+
 ## Current foundation
 
 Implemented foundation:

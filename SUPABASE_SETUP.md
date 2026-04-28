@@ -22,6 +22,7 @@ Run the migrations in `supabase/migrations` in order in the Supabase SQL editor,
 1. `001_multitenant_supabase.sql`
 2. `002_onboarding_and_operations.sql`
 3. `004_security_hardening.sql`
+4. `005_low_latency_indexes.sql`
 
 Optional cleanup migration/script for removing demo data before real onboarding:
 
@@ -114,3 +115,37 @@ pnpm build
 ```
 
 The frontend is wired through `src/lib/database`. Supabase is the implemented adapter, but additional adapters can be added for hospitals that require another backend.
+
+## 7. Database indexing
+
+Low-latency database indexes are defined in:
+
+```text
+supabase/migrations/005_low_latency_indexes.sql
+```
+
+Apply it after the main schema/security migrations.
+
+Indexing rule used in this project:
+
+```text
+tenant_id first, then page-specific filters/status, then sort column
+```
+
+Examples:
+
+```sql
+-- Patient search within a hospital
+create index if not exists patients_tenant_name_lower_idx
+on public.patients (tenant_id, lower(name));
+
+-- Department work queue
+create index if not exists investigations_tenant_department_status_idx
+on public.investigations (tenant_id, department_id, status, created_at desc);
+
+-- Recent timeline/history
+create index if not exists timeline_events_tenant_timestamp_idx
+on public.timeline_events (tenant_id, timestamp desc);
+```
+
+This keeps queries fast and tenant-scoped. Use `EXPLAIN ANALYZE` in staging when adding new high-volume screens.
